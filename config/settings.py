@@ -62,10 +62,7 @@ TEMPLATES = [
 # ASGI — requis pour Django Channels (WebSocket)
 ASGI_APPLICATION = "config.asgi.application"
 
-configured_database_path = os.environ.get("DATABASE_PATH")
-if configured_database_path:
-    database_path = Path(configured_database_path)
-elif Path("/data").is_dir():
+if Path("/data").is_dir():
     database_path = Path("/data/amsen.db")
 elif not DEBUG:
     # Render's filesystem is ephemeral unless a persistent disk is mounted.
