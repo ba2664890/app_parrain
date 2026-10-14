@@ -1,0 +1,16 @@
+# Local secrets (keep the committed deployment template)
+.env
+.env.*
+!.env.docker.example
+
+# Python virtual environments and generated files
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local database and generated static/media files
+*.sqlite3
+*.db
+staticfiles/
+media/

@@ -23,9 +23,9 @@ FILIERE_COULEUR = {
 }
 
 FILIERE_LIBELLE = {
-    "AS": "Actuariat & Statistique",
-    "ISE_ECO": "Économie Appliquée",
-    "ISE_MATH": "Mathématiques & Data",
+    "AS": "Analyste statisticien",
+    "ISE_ECO": "Ingénieur statisticien économiste",
+    "ISE_MATH": "Ingénieur statisticien économiste",
     "ISEP": "Cycle Ingénieurs",
 }
 
