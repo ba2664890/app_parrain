@@ -9,6 +9,9 @@ venv/
 __pycache__/
 *.py[cod]
 
+# JavaScript dependencies do not belong to the Django backend
+node_modules/
+
 # Local database and generated static/media files
 *.sqlite3
 *.db
