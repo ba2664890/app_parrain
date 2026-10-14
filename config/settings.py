@@ -62,10 +62,24 @@ TEMPLATES = [
 # ASGI — requis pour Django Channels (WebSocket)
 ASGI_APPLICATION = "config.asgi.application"
 
+configured_database_path = os.environ.get("DATABASE_PATH")
+if configured_database_path:
+    database_path = Path(configured_database_path)
+elif Path("/data").is_dir():
+    database_path = Path("/data/amsen.db")
+elif not DEBUG:
+    # Render's filesystem is ephemeral unless a persistent disk is mounted.
+    # /tmp remains writable so the service can at least start without a disk.
+    database_path = Path("/tmp/amsen.db")
+else:
+    database_path = BASE_DIR.parent / "db" / "amsen.db"
+
+database_path.parent.mkdir(parents=True, exist_ok=True)
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.environ.get("DATABASE_PATH", str(BASE_DIR / ".." / "db" / "amsen.db")),
+        "NAME": str(database_path),
     }
 }
 
