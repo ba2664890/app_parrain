@@ -17,6 +17,8 @@ from .models import Filiere, Etudiant, Jeton, Evenement, Parrainage, JournalAudi
 
 FILIERE_COULEUR = {
     "AS": "#1F7A3A",
+    "ISE": "#FFD800",
+    "ISE3_eco": "#FFD800",
     "ISE_ECO": "#FFD800",
     "ISE_MATH": "#C62F24",
     "ISEP": "#1F7A3A",
@@ -24,6 +26,8 @@ FILIERE_COULEUR = {
 
 FILIERE_LIBELLE = {
     "AS": "Analyste statisticien",
+    "ISE": "Ingénieur statisticien économiste — classe commune",
+    "ISE3_eco": "ISE3",
     "ISE_ECO": "Ingénieur statisticien économiste",
     "ISE_MATH": "Ingénieur statisticien économiste",
     "ISEP": "Cycle Ingénieurs",
@@ -173,9 +177,17 @@ def generer_toutes_urnes(evenement) -> str:
         if nb_nouveaux == 0:
             continue
 
+        mentor_filiere_codes = [filiere.code]
+        if filiere.code in {"ISE_ECO", "ISE_MATH"}:
+            mentor_filiere_codes.extend(["ISE", "ISE3_eco"])
+
         for niveau in [2, 3]:
             parrains = list(
-                Etudiant.objects.filter(filiere=filiere, niveau=niveau, absent=False)
+                Etudiant.objects.filter(
+                    filiere_id__in=mentor_filiere_codes,
+                    niveau=niveau,
+                    absent=False,
+                ).order_by("filiere_id", "nom", "prenom")
             )
             if not parrains:
                 continue
@@ -239,8 +251,10 @@ def calculer_stats():
     for f in filieres:
         total_n = etu_map.get((f.code, 1), 0)
         parraines = parraines_map.get(f.code, 0)
-        parrains_2a = etu_map.get((f.code, 2), 0)
-        parrains_3a = etu_map.get((f.code, 3), 0)
+        shared_2a = etu_map.get(("ISE", 2), 0) if f.code in {"ISE_ECO", "ISE_MATH"} else 0
+        shared_3a = etu_map.get(("ISE3_eco", 3), 0) if f.code in {"ISE_ECO", "ISE_MATH"} else 0
+        parrains_2a = etu_map.get((f.code, 2), 0) + shared_2a
+        parrains_3a = etu_map.get((f.code, 3), 0) + shared_3a
         jetons_2a = jetons_map.get((f.code, 2), 0)
         jetons_3a = jetons_map.get((f.code, 3), 0)
 

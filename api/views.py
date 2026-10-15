@@ -6,6 +6,7 @@ import secrets
 import json
 import csv
 import io
+import unicodedata
 from django.http import HttpResponse
 from django.utils import timezone
 from django.db import transaction
@@ -341,64 +342,88 @@ class ImportView(APIView):
         if not rows:
             return Response({"error": "CSV vide"}, status=400)
 
-        # Skip header si première cellule = "nom"
         start = 1 if rows and rows[0] and rows[0][0].strip().lower() == "nom" else 0
 
-        event = get_evenement_actif()
-        count = 0
-        imported = []
+        def identity_key(nom, prenom, filiere_code, niveau):
+            def normalize(value):
+                ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+                return " ".join(ascii_value.casefold().split())
+            return normalize(nom), normalize(prenom), filiere_code, niveau
 
-        for row in rows[start:]:
-            if len(row) < 4:
+        incoming = []
+        for line_number, row in enumerate(rows[start:], start=start + 1):
+            if len(row) < 4 or not any(cell.strip() for cell in row):
                 continue
-            nom = row[0].strip()
-            prenom = row[1].strip()
-            filiere_code = row[2].strip()
+            nom, prenom, filiere_code = (cell.strip() for cell in row[:3])
             try:
                 niveau = int(row[3].strip())
             except ValueError:
-                continue
-            if not nom or not prenom or not filiere_code:
-                continue
-            if niveau not in [1, 2, 3]:
-                continue
+                return Response({"error": f"Niveau invalide à la ligne {line_number}"}, status=400)
+            if not nom or not prenom or not filiere_code or niveau not in [1, 2, 3]:
+                return Response({"error": f"Données invalides à la ligne {line_number}"}, status=400)
+            incoming.append({
+                "nom": nom,
+                "prenom": prenom,
+                "filiere": filiere_code,
+                "niveau": niveau,
+                "photo": row[4].strip() if len(row) > 4 else "",
+                "telephone": row[5].strip() if len(row) > 5 else "",
+                "email": row[6].strip() if len(row) > 6 else "",
+                "indice1": row[7].strip() if len(row) > 7 else "",
+                "indice2": row[8].strip() if len(row) > 8 else "",
+                "indice3": row[9].strip() if len(row) > 9 else "",
+            })
 
-            photo = row[4].strip() if len(row) > 4 else ""
-            telephone = row[5].strip() if len(row) > 5 else ""
-            email = row[6].strip() if len(row) > 6 else ""
-            indice1 = row[7].strip() if len(row) > 7 else ""
-            indice2 = row[8].strip() if len(row) > 8 else ""
-            indice3 = row[9].strip() if len(row) > 9 else ""
+        if not incoming:
+            return Response({"error": "Aucune ligne étudiant valide"}, status=400)
 
-            # Créer la filière si elle n'existe pas
-            Filiere.objects.get_or_create(
-                code=filiere_code,
-                defaults={
-                    "libelle": FILIERE_LIBELLE.get(filiere_code, filiere_code),
-                    "couleur": FILIERE_COULEUR.get(filiere_code, "#1F7A3A"),
-                    "ordre": 0,
-                },
-            )
+        event = get_evenement_actif()
+        imported = []
+        skipped_existing = 0
+        with transaction.atomic():
+            existing_keys = {
+                identity_key(nom, prenom, filiere_code, niveau)
+                for nom, prenom, filiere_code, niveau in Etudiant.objects.values_list(
+                    "nom", "prenom", "filiere_id", "niveau"
+                )
+            }
+            for student in incoming:
+                key = identity_key(student["nom"], student["prenom"], student["filiere"], student["niveau"])
+                if key in existing_keys:
+                    skipped_existing += 1
+                    continue
+                filiere_code = student["filiere"]
+                Filiere.objects.get_or_create(
+                    code=filiere_code,
+                    defaults={
+                        "libelle": FILIERE_LIBELLE.get(filiere_code, filiere_code),
+                        "couleur": FILIERE_COULEUR.get(filiere_code, "#1F7A3A"),
+                        "ordre": 0,
+                    },
+                )
+                Etudiant.objects.create(
+                    nom=student["nom"],
+                    prenom=student["prenom"],
+                    filiere_id=filiere_code,
+                    niveau=student["niveau"],
+                    photo=student["photo"] or None,
+                    telephone=student["telephone"] or None,
+                    email=student["email"] or None,
+                    indice1=student["indice1"] or None,
+                    indice2=student["indice2"] or None,
+                    indice3=student["indice3"] or None,
+                )
+                existing_keys.add(key)
+                imported.append({"nom": student["nom"], "prenom": student["prenom"], "filiereCode": filiere_code, "niveau": student["niveau"]})
 
-            Etudiant.objects.create(
-                nom=nom,
-                prenom=prenom,
-                filiere_id=filiere_code,
-                niveau=niveau,
-                photo=photo or None,
-                telephone=telephone or None,
-                email=email or None,
-                indice1=indice1 or None,
-                indice2=indice2 or None,
-                indice3=indice3 or None,
-            )
-            imported.append({"nom": nom, "prenom": prenom, "filiereCode": filiere_code, "niveau": niveau})
-            count += 1
-
-        JournalAudit.enregistrer(event, "import", "pilote", {"count": count, "sample": imported[:5]})
+            JournalAudit.enregistrer(event, "import", "pilote", {
+                "count": len(imported),
+                "skipped_existing": skipped_existing,
+                "sample": imported[:5],
+            })
         stats = calculer_stats()
         broadcast("stats:update", stats)
-        return Response({"ok": True, "count": count})
+        return Response({"ok": True, "count": len(imported), "skipped_existing": skipped_existing})
 
 
 # ---------------------------------------------------------------------------
