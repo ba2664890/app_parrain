@@ -4,6 +4,11 @@ import hashlib
 from django.db import models
 
 
+def generate_id():
+    """Generate a URL-safe primary key that fits the 36-character columns."""
+    return secrets.token_urlsafe(27)
+
+
 class Filiere(models.Model):
     code = models.CharField(max_length=20, primary_key=True)
     libelle = models.CharField(max_length=100)
@@ -21,7 +26,7 @@ class Filiere(models.Model):
 class Etudiant(models.Model):
     NIVEAU_CHOICES = [(1, "Nouveau"), (2, "Parrain 2A"), (3, "Parrain 3A")]
 
-    id = models.CharField(max_length=36, primary_key=True, default=secrets.token_urlsafe)
+    id = models.CharField(max_length=36, primary_key=True, default=generate_id)
     nom = models.CharField(max_length=100)
     prenom = models.CharField(max_length=100)
     filiere = models.ForeignKey(Filiere, on_delete=models.PROTECT, related_name="etudiants")
@@ -66,7 +71,7 @@ class Evenement(models.Model):
         ("difficile", "Difficile"),
     ]
 
-    id = models.CharField(max_length=36, primary_key=True, default=secrets.token_urlsafe)
+    id = models.CharField(max_length=36, primary_key=True, default=generate_id)
     nom = models.CharField(max_length=200)
     date = models.DateTimeField(auto_now_add=True)
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default="preparation")
@@ -88,7 +93,7 @@ class Evenement(models.Model):
 
 
 class Jeton(models.Model):
-    id = models.CharField(max_length=36, primary_key=True, default=secrets.token_urlsafe)
+    id = models.CharField(max_length=36, primary_key=True, default=generate_id)
     evenement = models.ForeignKey(Evenement, on_delete=models.CASCADE, related_name="jetons")
     filiere = models.ForeignKey(Filiere, on_delete=models.CASCADE, related_name="jetons")
     niveau = models.IntegerField()
@@ -111,7 +116,7 @@ class Jeton(models.Model):
 
 
 class Parrainage(models.Model):
-    id = models.CharField(max_length=36, primary_key=True, default=secrets.token_urlsafe)
+    id = models.CharField(max_length=36, primary_key=True, default=generate_id)
     evenement = models.ForeignKey(Evenement, on_delete=models.CASCADE, related_name="parrainages")
     filleul = models.ForeignKey(
         Etudiant, on_delete=models.PROTECT, related_name="filleul_de"
@@ -140,7 +145,7 @@ class Parrainage(models.Model):
 
 
 class JournalAudit(models.Model):
-    id = models.CharField(max_length=36, primary_key=True, default=secrets.token_urlsafe)
+    id = models.CharField(max_length=36, primary_key=True, default=generate_id)
     evenement = models.ForeignKey(
         Evenement, on_delete=models.SET_NULL, null=True, blank=True, related_name="audits"
     )
