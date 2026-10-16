@@ -3,6 +3,7 @@ Django settings — AMSEN Parrainage Backend
 """
 from pathlib import Path
 import os
+from urllib.parse import parse_qs, unquote, urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -62,23 +63,45 @@ TEMPLATES = [
 # ASGI — requis pour Django Channels (WebSocket)
 ASGI_APPLICATION = "config.asgi.application"
 
-if Path("/data").is_dir():
-    database_path = Path("/data/amsen.db")
-elif not DEBUG:
-    # Render's filesystem is ephemeral unless a persistent disk is mounted.
-    # /tmp remains writable so the service can at least start without a disk.
-    database_path = Path("/tmp/amsen.db")
-else:
-    database_path = BASE_DIR.parent / "db" / "amsen.db"
+database_url = os.environ.get("DATABASE_URL", "").strip()
+if database_url:
+    parsed_database_url = urlparse(database_url)
+    if parsed_database_url.scheme not in {"postgres", "postgresql"}:
+        raise RuntimeError("DATABASE_URL must be a PostgreSQL URL")
 
-database_path.parent.mkdir(parents=True, exist_ok=True)
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": str(database_path),
+    database_options = {
+        key: values[-1] for key, values in parse_qs(parsed_database_url.query).items()
     }
-}
+    database_options.setdefault("sslmode", "require")
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": unquote(parsed_database_url.path.lstrip("/")),
+            "USER": unquote(parsed_database_url.username or ""),
+            "PASSWORD": unquote(parsed_database_url.password or ""),
+            "HOST": parsed_database_url.hostname or "",
+            "PORT": parsed_database_url.port or "",
+            "OPTIONS": database_options,
+            "CONN_MAX_AGE": 600,
+        }
+    }
+else:
+    if Path("/data").is_dir():
+        database_path = Path("/data/amsen.db")
+    elif not DEBUG:
+        # Render's filesystem is ephemeral unless a persistent disk is mounted.
+        # /tmp remains writable so the service can at least start without a disk.
+        database_path = Path("/tmp/amsen.db")
+    else:
+        database_path = BASE_DIR.parent / "db" / "amsen.db"
+
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": str(database_path),
+        }
+    }
 
 # Django Channels — couche InMemory (simple, sans Redis)
 CHANNEL_LAYERS = {
