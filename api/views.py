@@ -137,16 +137,6 @@ class TirageExecuterView(APIView):
         if not nouveau_id:
             return Response({"error": "nouveauId requis"}, status=400)
 
-        try:
-            filleul = Etudiant.objects.select_related("filiere").get(pk=nouveau_id, niveau=1)
-        except Etudiant.DoesNotExist:
-            return Response({"error": f"Nouveau introuvable : {nouveau_id}"}, status=404)
-
-        if filleul.tire:
-            return Response({"error": f"Nouveau {filleul.prenom} {filleul.nom} déjà tiré"}, status=409)
-        if filleul.absent:
-            return Response({"error": f"Nouveau {filleul.prenom} {filleul.nom} est absent"}, status=409)
-
         event = get_evenement_actif()
         if not event:
             return Response({"error": "Aucun événement actif"}, status=400)
@@ -155,6 +145,25 @@ class TirageExecuterView(APIView):
 
         try:
             with transaction.atomic():
+                # Plusieurs pilotes peuvent avoir reçu le même candidat avant
+                # que le premier tirage soit confirmé. Recharger sous verrou et
+                # revérifier son état pour empêcher un double parrainage.
+                filleul = (
+                    Etudiant.objects.select_for_update()
+                    .select_related("filiere")
+                    .get(pk=nouveau_id, niveau=1)
+                )
+                if filleul.tire:
+                    return Response(
+                        {"error": f"Nouveau {filleul.prenom} {filleul.nom} déjà tiré"},
+                        status=409,
+                    )
+                if filleul.absent:
+                    return Response(
+                        {"error": f"Nouveau {filleul.prenom} {filleul.nom} est absent"},
+                        status=409,
+                    )
+
                 # Tire un parrain 2A et un parrain 3A
                 jeton2 = tirer_jeton(filleul.filiere_id, 2, event)
                 if not jeton2:
@@ -210,6 +219,8 @@ class TirageExecuterView(APIView):
 
             return Response(tirage)
 
+        except Etudiant.DoesNotExist:
+            return Response({"error": f"Nouveau introuvable : {nouveau_id}"}, status=404)
         except Exception as e:
             msg = str(e)
             s = 409 if msg in ("urne vide",) or msg.startswith("Nouveau") or msg.startswith("Aucun") else 500
