@@ -123,13 +123,15 @@ class TirageProchainView(APIView):
             candidats = autres_candidats
 
         if not candidats:
-            stats = calculer_stats()
-            broadcast("stats:update", stats)
-            return Response({"nouveau": None})
+            nouveaux_non_tires = Etudiant.objects.filter(
+                niveau=1, filiere_id=filiere_param, tire=False
+            )
+            raison = "absents_restants" if nouveaux_non_tires.exists() else "filiere_terminee"
+            return Response({"nouveau": None, "raison": raison})
 
         idx = crypto_randint(len(candidats))
         nouveau = map_etudiant(candidats[idx])
-        return Response({"nouveau": nouveau})
+        return Response({"nouveau": nouveau, "raison": None})
 
 
 # ---------------------------------------------------------------------------
