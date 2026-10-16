@@ -85,23 +85,7 @@ if database_url:
             "CONN_MAX_AGE": 600,
         }
     }
-else:
-    if Path("/data").is_dir():
-        database_path = Path("/data/amsen.db")
-    elif not DEBUG:
-        # Render's filesystem is ephemeral unless a persistent disk is mounted.
-        # /tmp remains writable so the service can at least start without a disk.
-        database_path = Path("/tmp/amsen.db")
-    else:
-        database_path = BASE_DIR.parent / "db" / "amsen.db"
 
-    database_path.parent.mkdir(parents=True, exist_ok=True)
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": str(database_path),
-        }
-    }
 
 # Django Channels — couche InMemory (simple, sans Redis)
 CHANNEL_LAYERS = {
