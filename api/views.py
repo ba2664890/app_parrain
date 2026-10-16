@@ -49,6 +49,18 @@ def map_etudiant(e: Etudiant) -> dict:
     }
 
 
+def map_portrait(e: Etudiant) -> dict:
+    """Projection publique utilisée par les bandes décoratives du tirage."""
+    return {
+        "id": e.id,
+        "nom": e.nom,
+        "prenom": e.prenom,
+        "filiereCode": e.filiere_id,
+        "niveau": e.niveau,
+        "photo": e.photo,
+    }
+
+
 # ---------------------------------------------------------------------------
 # GET /api/stats/
 # ---------------------------------------------------------------------------
@@ -60,6 +72,33 @@ class StatsView(APIView):
             return Response(stats, headers={"Cache-Control": "no-store"})
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/portraits/?filiere=AS
+# ---------------------------------------------------------------------------
+
+class PortraitsView(APIView):
+    """Retourne uniquement les informations nécessaires aux portraits animés."""
+
+    def get(self, request):
+        filiere = request.query_params.get("filiere", "").strip()
+        if not filiere:
+            return Response({"error": "filiere requise"}, status=400)
+        if not Filiere.objects.filter(code=filiere).exists():
+            return Response({"error": "Filière inconnue"}, status=400)
+
+        portraits = Etudiant.objects.filter(
+            filiere_id=filiere,
+            niveau__in=[2, 3],
+            absent=False,
+        ).only("id", "nom", "prenom", "filiere_id", "niveau", "photo").order_by(
+            "niveau", "prenom", "nom"
+        )
+        return Response(
+            {"portraits": [map_portrait(etudiant) for etudiant in portraits]},
+            headers={"Cache-Control": "no-store"},
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     # Stats globales
     path("stats/", views.StatsView.as_view(), name="stats"),
+    path("portraits/", views.PortraitsView.as_view(), name="portraits"),
 
     # Événements
     path("evenements/", views.EvenementView.as_view(), name="evenements"),
