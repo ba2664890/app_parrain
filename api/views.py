@@ -176,7 +176,9 @@ class TirageExecuterView(APIView):
 
                 jeton3 = tirer_jeton(filleul.filiere_id, 3, event)
                 if not jeton3:
-                    return Response({"error": "Aucun parrain 3A disponible"}, status=409)
+                    # Lever une exception pour annuler aussi le jeton 2A déjà
+                    # marqué utilisé dans cette même transaction.
+                    raise RuntimeError("Aucun parrain 3A disponible")
 
                 # Marquer le nouveau comme tiré
                 filleul.tire = True
