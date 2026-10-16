@@ -117,6 +117,11 @@ class TirageProchainView(APIView):
                 niveau=1, filiere_id=filiere_param, tire=False, absent=False
             )
         )
+        candidat_actuel_id = request.data.get("excludeId", "").strip()
+        autres_candidats = [c for c in candidats if c.id != candidat_actuel_id]
+        if autres_candidats:
+            candidats = autres_candidats
+
         if not candidats:
             stats = calculer_stats()
             broadcast("stats:update", stats)
